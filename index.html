@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A Turing Test game for the DEV.to June Solstice Game Jam. Unmask the machine before the candle burns out.">
+  <title>The Imitation Game — Solstice Edition</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #0a0d1a;
+      --amber:        #e8c97a;
+      --amber-dim:    #b09050;
+      --panel-bg:     #0b0e1c;
+      --panel-border: rgba(232,201,122,0.18);
+      --text:         #d0c4a0;
+      --text-dim:     #7a6e55;
+      --green:        #5aaa72;
+      --red:          #c05050;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Crimson Text', serif;
+      font-size: 18px;
+      line-height: 1.5;
+      overflow-x: hidden;
+      transition: background-color 3.5s ease-in-out;
+    }
+
+    /* Radial vignette */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.65) 100%);
+      z-index: 999;
+    }
+
+    /* Ambient candlelight glow — pulses slowly */
+    .ambient {
+      position: fixed;
+      top: -60px; left: 50%;
+      transform: translateX(-50%);
+      width: 700px; height: 420px;
+      background: radial-gradient(ellipse at top, rgba(232,201,122,0.07) 0%, transparent 65%);
+      pointer-events: none;
+      z-index: 0;
+      animation: ambient-pulse 4s ease-in-out infinite;
+    }
+    @keyframes ambient-pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.5; }
+    }
+
+    /* ── SCREENS ── */
+    .screen {
+      display: none;
+      min-height: 100vh;
+      flex-direction: column;
+      position: relative;
+      z-index: 1;
+    }
+    .screen.active { display: flex; }
+
+    /* Centred layouts */
+    #screen-intro,
+    #screen-reveal,
+    #screen-win,
+    #screen-lose {
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem 1.5rem;
+    }
+
+    /* ─────────────────────────────────────────
+       INTRO SCREEN
+    ───────────────────────────────────────── */
+    .intro-flame {
+      font-size: 3rem;
+      display: block;
+      margin-bottom: 0.4rem;
+      animation: flicker-emoji 1.7s ease-in-out infinite;
+      filter: drop-shadow(0 0 12px rgba(232,201,122,0.6));
+    }
+    @keyframes flicker-emoji {
+      0%,100% { transform: scale(1) rotate(0deg); }
+      25%     { transform: scale(0.92) rotate(-3deg); }
+      60%     { transform: scale(1.08) rotate(2deg); }
+    }
+
+    .intro-title {
+      font-family: 'UnifrakturMaguntia', cursive;
+      font-size: clamp(2.4rem, 7vw, 4.5rem);
+      color: var(--amber);
+      text-shadow: 0 0 28px rgba(232,201,122,0.65), 0 0 60px rgba(232,201,122,0.2);
+      line-height: 1.05;
+      margin-bottom: 0.25rem;
+    }
+    .intro-subtitle {
+      font-style: italic;
+      color: var(--amber-dim);
+      font-size: 1.15rem;
+      letter-spacing: 0.15em;
+      margin-bottom: 2.25rem;
+    }
+
+    .intro-rules {
+      max-width: 480px;
+      width: 100%;
+      background: rgba(232,201,122,0.04);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+      text-align: left;
+    }
+    .intro-rules h3 {
+      color: var(--amber);
+      font-size: 0.9rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      text-align: center;
+      margin-bottom: 0.75rem;
+    }
+    .intro-rules ul { list-style: none; }
+    .intro-rules li {
+      color: var(--text-dim);
+      font-size: 0.95rem;
+      padding: 0.18rem 0;
+    }
+    .intro-rules li::before { content: '▸ '; color: var(--amber-dim); }
+
+    .key-group {
+      max-width: 380px;
+      width: 100%;
+      margin-bottom: 1.5rem;
+    }
+    .key-group label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--amber-dim);
+      letter-spacing: 0.07em;
+      margin-bottom: 0.4rem;
+    }
+    .key-group input {
+      width: 100%;
+      background: rgba(232,201,122,0.04);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      padding: 0.65rem 0.9rem;
+      color: var(--text);
+      font-family: 'Crimson Text', serif;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .key-group input:focus { border-color: var(--amber-dim); }
+    .key-note {
+      display: block;
+      margin-top: 0.35rem;
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    /* Primary button — shared */
+    .btn-primary {
+      background: transparent;
+      border: 2px solid var(--amber);
+      color: var(--amber);
+      font-family: 'Crimson Text', serif;
+      font-size: 1.12rem;
+      padding: 0.7rem 2.5rem;
+      border-radius: 6px;
+      cursor: pointer;
+      letter-spacing: 0.1em;
+      transition: background 0.2s, box-shadow 0.2s;
+      text-shadow: 0 0 10px rgba(232,201,122,0.3);
+      box-shadow: 0 0 18px rgba(232,201,122,0.1);
+    }
+    .btn-primary:hover {
+      background: rgba(232,201,122,0.09);
+      box-shadow: 0 0 28px rgba(232,201,122,0.25);
+    }
+
+    .credit {
+      margin-top: 2.5rem;
+      font-style: italic;
+      color: var(--text-dim);
+      font-size: 0.82rem;
+      opacity: 0.65;
+    }
+
+    /* ─────────────────────────────────────────
+       PLAYING SCREEN
+    ───────────────────────────────────────── */
+    #screen-playing {
+      padding: 0.75rem;
+      gap: 0.7rem;
+      align-items: stretch;
+    }
+
+    /* Header row */
+    .playing-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.2rem 0.4rem;
+      flex-shrink: 0;
+    }
+    .round-badge {
+      font-size: 0.88rem;
+      color: var(--amber-dim);
+      letter-spacing: 0.05em;
+    }
+    .score-badge {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+    .score-badge .c { color: var(--green); }
+    .score-badge .w { color: var(--red); }
+
+    /* ── Candle SVG ── */
+    .candle-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.1rem;
+    }
+    #candle-svg {
+      width: 44px;
+      height: 110px;
+      overflow: visible;
+      filter: drop-shadow(0 0 7px rgba(232,201,122,0.4));
+    }
+
+    @keyframes flame-flicker {
+      0%   { transform: scale(1,1)       rotate(0deg);    }
+      18%  { transform: scale(.93,1.06)  rotate(-1.8deg); }
+      34%  { transform: scale(1.07,.93)  rotate(1deg);    }
+      52%  { transform: scale(.96,1.05)  rotate(-1.2deg); }
+      68%  { transform: scale(1.05,.95)  rotate(.6deg);   }
+      84%  { transform: scale(.97,1.04)  rotate(-.6deg);  }
+      100% { transform: scale(1,1)       rotate(0deg);    }
+    }
+
+    #flame-g {
+      transform-box: fill-box;
+      transform-origin: center bottom;
+      animation: flame-flicker 2s ease-in-out infinite;
+    }
+
+    .candle-pct {
+      font-size: 0.72rem;
+      color: var(--amber-dim);
+    }
+
+    /* ── Panels ── */
+    .panels-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.7rem;
+      flex: 1;
+      min-height: 0;
+    }
+    .panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: inset 0 1px 20px rgba(0,0,0,0.45);
+      min-height: 180px;
+    }
+    .panel-head {
+      font-size: 0.88rem;
+      color: var(--amber);
+      text-align: center;
+      letter-spacing: 0.13em;
+      border-bottom: 1px solid var(--panel-border);
+      padding-bottom: 0.4rem;
+      margin-bottom: 0.6rem;
+      flex-shrink: 0;
+    }
+    .panel-feed {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      scrollbar-width: thin;
+      scrollbar-color: #3a2e1a transparent;
+    }
+    .panel-feed::-webkit-scrollbar { width: 3px; }
+    .panel-feed::-webkit-scrollbar-thumb { background: #3a2e1a; border-radius: 2px; }
+
+    .msg { font-size: 0.92rem; line-height: 1.55; }
+    .msg.q { font-style: italic; color: var(--amber-dim); font-size: 0.82rem; }
+    .msg.a { color: var(--text); }
+    .msg.loading { color: var(--text-dim); font-style: italic; }
+    .msg.atmosphere { color: var(--text-dim); font-style: italic; font-size: 0.82rem; }
+
+    /* ── Question area ── */
+    .q-area {
+      background: rgba(232,201,122,0.025);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 0.85rem;
+      flex-shrink: 0;
+    }
+    .q-suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-bottom: 0.65rem;
+    }
+    .btn-q {
+      background: transparent;
+      border: 1px solid rgba(232,201,122,0.22);
+      color: var(--text-dim);
+      font-family: 'Crimson Text', serif;
+      font-size: 0.83rem;
+      padding: 0.28rem 0.7rem;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.18s;
+      font-style: italic;
+    }
+    .btn-q:hover {
+      border-color: var(--amber-dim);
+      color: var(--amber);
+      background: rgba(232,201,122,0.06);
+    }
+
+    .ask-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.55rem;
+    }
+    .ask-row input {
+      flex: 1;
+      background: rgba(232,201,122,0.04);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      padding: 0.55rem 0.8rem;
+      color: var(--text);
+      font-family: 'Crimson Text', serif;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+      min-width: 0;
+    }
+    .ask-row input:focus { border-color: var(--amber-dim); }
+    .ask-row input::placeholder { color: var(--text-dim); font-style: italic; }
+
+    .btn-ask {
+      background: rgba(232,201,122,0.08);
+      border: 1px solid var(--amber-dim);
+      color: var(--amber);
+      font-family: 'Crimson Text', serif;
+      font-size: 0.9rem;
+      padding: 0.55rem 1.1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.18s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .btn-ask:hover:not(:disabled) { background: rgba(232,201,122,0.16); }
+    .btn-ask:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .accuse-row {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: center;
+    }
+    .btn-accuse {
+      background: transparent;
+      border: 1px solid rgba(192,80,80,0.5);
+      color: #c07070;
+      font-family: 'Crimson Text', serif;
+      font-size: 0.95rem;
+      padding: 0.42rem 1.4rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.18s;
+      letter-spacing: 0.04em;
+    }
+    .btn-accuse:hover:not(:disabled) {
+      background: rgba(192,80,80,0.1);
+      border-color: #c07070;
+    }
+    .btn-accuse:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* ─────────────────────────────────────────
+       REVEAL SCREEN
+    ───────────────────────────────────────── */
+    .reveal-verdict {
+      font-family: 'UnifrakturMaguntia', cursive;
+      font-size: clamp(2.5rem, 7vw, 4rem);
+      margin-bottom: 0.3rem;
+    }
+    .reveal-verdict.correct { color: var(--green); text-shadow: 0 0 24px rgba(90,170,114,0.5); }
+    .reveal-verdict.wrong   { color: var(--red);   text-shadow: 0 0 24px rgba(192,80,80,0.5);  }
+
+    .reveal-line {
+      color: var(--text-dim);
+      font-style: italic;
+      font-size: 1rem;
+      margin-bottom: 1.75rem;
+      max-width: 500px;
+    }
+
+    .reveal-panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      width: 100%;
+      max-width: 660px;
+      margin-bottom: 1.5rem;
+    }
+    .reveal-panel {
+      border-radius: 8px;
+      padding: 1rem;
+      border: 1px solid;
+      text-align: left;
+    }
+    .reveal-panel.human   { border-color: rgba(90,170,114,0.35);  background: rgba(90,170,114,0.04); }
+    .reveal-panel.machine { border-color: rgba(192,80,80,0.35);   background: rgba(192,80,80,0.04);  }
+    .rp-tag {
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 0.35rem;
+    }
+    .reveal-panel.human   .rp-tag { color: var(--green); }
+    .reveal-panel.machine .rp-tag { color: var(--red);   }
+    .rp-name   { font-size: 1.05rem; color: var(--text); margin-bottom: 0.4rem; }
+    .rp-answer { font-size: 0.85rem; color: var(--text-dim); font-style: italic; line-height: 1.45; }
+
+    .tell-box {
+      max-width: 520px;
+      width: 100%;
+      background: rgba(232,201,122,0.04);
+      border: 1px solid var(--panel-border);
+      border-left: 3px solid var(--amber);
+      border-radius: 4px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      text-align: left;
+    }
+    .tell-label {
+      font-size: 0.72rem;
+      color: var(--amber-dim);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+    .tell-text {
+      color: var(--text);
+      font-size: 0.97rem;
+      line-height: 1.6;
+      font-style: italic;
+    }
+
+    .reveal-score { font-size: 0.88rem; color: var(--text-dim); margin-bottom: 1.5rem; }
+
+    /* ─────────────────────────────────────────
+       WIN / LOSE SCREENS
+    ───────────────────────────────────────── */
+    .end-title {
+      font-family: 'UnifrakturMaguntia', cursive;
+      font-size: clamp(2.5rem, 8vw, 4.5rem);
+      margin-bottom: 0.75rem;
+    }
+    #screen-win .end-title {
+      color: var(--amber);
+      text-shadow: 0 0 40px rgba(232,201,122,0.8), 0 0 80px rgba(232,201,122,0.3);
+    }
+    #screen-lose .end-title { color: #484848; }
+
+    .end-subtitle { font-style: italic; font-size: 1.12rem; margin-bottom: 2rem; }
+    #screen-win .end-subtitle  { color: var(--amber-dim); }
+    #screen-lose .end-subtitle { color: var(--text-dim);  }
+
+    .end-stat   { font-size: 1.4rem; color: var(--amber); margin-bottom: 0.4rem; }
+    .end-detail { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 2rem; }
+
+    /* Smoke wisps */
+    #smoke-wrap {
+      position: relative;
+      height: 90px;
+      width: 80px;
+      margin-bottom: 0.75rem;
+    }
+    .wisp {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 2px;
+      background: linear-gradient(to top, rgba(180,160,140,0.5), transparent);
+      border-radius: 1px;
+    }
+
+    /* ─────────────────────────────────────────
+       RESPONSIVE
+    ───────────────────────────────────────── */
+    @media (max-width: 680px) {
+      .panels-row { grid-template-columns: 1fr; }
+      .panel      { max-height: 200px; }
+      .reveal-panels { grid-template-columns: 1fr; }
+      .q-suggestions { flex-direction: column; }
+      .btn-q     { text-align: left; }
+    }
+
+    @media (max-width: 400px) {
+      .playing-header { flex-direction: column; gap: 0.4rem; }
+      .btn-accuse     { font-size: 0.8rem; padding: 0.38rem 0.9rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Ambient background glow -->
+<div class="ambient" aria-hidden="true"></div>
+
+
+<!-- ═══════════════════════════════════════════════
+     INTRO SCREEN
+═══════════════════════════════════════════════ -->
+<div id="screen-intro" class="screen active">
+
+  <span class="intro-flame" aria-hidden="true">🕯</span>
+  <h1 class="intro-title">The Imitation Game</h1>
+  <p class="intro-subtitle">— Solstice Edition —</p>
+
+  <div class="intro-rules">
+    <h3>The Rules</h3>
+    <ul>
+      <li>Two contestants appear before you in the dark.</li>
+      <li>One is human — one is a machine in disguise.</li>
+      <li>Both share the same name, age, and backstory.</li>
+      <li>Ask them questions. Find the tell. Accuse the machine.</li>
+      <li>5 rounds. Difficulty rises. The candle is your clock.</li>
+      <li>Correct → flame recovers &nbsp;·&nbsp; Wrong → flame shrinks.</li>
+      <li>Let the candle die and the night takes you.</li>
+    </ul>
+  </div>
+
+  <div class="key-group">
+    <label for="gemini-key">Gemini API Key</label>
+    <input type="password" id="gemini-key" placeholder="AIza…"
+           autocomplete="off" spellcheck="false"
+           onkeydown="if(event.key==='Enter') startGame()">
+    <span class="key-note">Stays in your browser. Never leaves this page.</span>
+  </div>
+
+  <button class="btn-primary" onclick="startGame()">Light the Candle</button>
+
+  <p class="credit">In honour of Alan Turing, born June 23, 1912.</p>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     PLAYING SCREEN
+═══════════════════════════════════════════════ -->
+<div id="screen-playing" class="screen">
+
+  <!-- Header: round · candle · score -->
+  <div class="playing-header">
+    <div class="round-badge">Round <span id="hdr-round">1</span> / 5</div>
+
+    <!-- Candle SVG -->
+    <div class="candle-wrap">
+      <svg id="candle-svg" viewBox="0 0 44 110" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="glow-grad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%"   stop-color="#ffcc44" stop-opacity="0.38"/>
+            <stop offset="100%" stop-color="#ffcc44" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+
+        <!-- Ambient glow halo -->
+        <ellipse id="flame-glow" cx="22" cy="26" rx="16" ry="16" fill="url(#glow-grad)"/>
+
+        <!-- Flame group — CSS-animated -->
+        <g id="flame-g">
+          <path d="M22 38 Q13 26 16 14 Q18 4 22 1 Q26 4 28 14 Q31 26 22 38Z"
+                fill="#ff8800" opacity="0.88"/>
+          <path d="M22 36 Q16 25 18 15 Q20 8 22 5 Q24 8 26 15 Q28 25 22 36Z"
+                fill="#ffd000"/>
+          <path d="M22 33 Q19 25 20 18 Q21 13 22 10 Q23 13 24 18 Q25 25 22 33Z"
+                fill="#fff5d0" opacity="0.9"/>
+        </g>
+
+        <!-- Wick -->
+        <line x1="22" y1="39" x2="22" y2="43"
+              stroke="#2a1a08" stroke-width="2" stroke-linecap="round"/>
+
+        <!-- Wax top cap -->
+        <ellipse cx="22" cy="43" rx="13" ry="3" fill="#c8a448"/>
+
+        <!-- Wax body — height & y managed by JS -->
+        <rect id="wax-body" x="9" y="43" width="26" height="63" rx="3" fill="#b08a28"/>
+
+        <!-- Wax highlight stripe -->
+        <rect id="wax-hi" x="12" y="47" width="4" height="55" rx="2"
+              fill="rgba(255,255,255,0.08)"/>
+      </svg>
+      <div class="candle-pct" id="hdr-pct">100%</div>
+    </div>
+
+    <div class="score-badge">
+      <span class="c">✓ <span id="hdr-correct">0</span></span>
+      &ensp;
+      <span class="w">✗ <span id="hdr-wrong">0</span></span>
+    </div>
+  </div>
+
+  <!-- Two contestant panels -->
+  <div class="panels-row">
+    <div class="panel">
+      <div class="panel-head">— Contestant A —</div>
+      <div class="panel-feed" id="feed-a"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">— Contestant B —</div>
+      <div class="panel-feed" id="feed-b"></div>
+    </div>
+  </div>
+
+  <!-- Question / accusation area -->
+  <div class="q-area">
+    <div class="q-suggestions" id="q-suggestions"></div>
+    <div class="ask-row">
+      <input type="text" id="q-input"
+             placeholder="Ask your own question…" maxlength="220"
+             onkeydown="if(event.key==='Enter') handleAsk()">
+      <button class="btn-ask" id="btn-ask" onclick="handleAsk()">Ask Both</button>
+    </div>
+    <div class="accuse-row">
+      <button class="btn-accuse" id="acc-a" onclick="accuse('A')">⚑ Accuse A</button>
+      <button class="btn-accuse" id="acc-b" onclick="accuse('B')">⚑ Accuse B</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     REVEAL SCREEN
+═══════════════════════════════════════════════ -->
+<div id="screen-reveal" class="screen">
+  <div id="rv-verdict" class="reveal-verdict"></div>
+  <p  id="rv-line"    class="reveal-line"></p>
+  <div id="rv-panels" class="reveal-panels"></div>
+  <div class="tell-box">
+    <div class="tell-label">The Tell You Were Looking For</div>
+    <div id="rv-tell" class="tell-text"></div>
+  </div>
+  <div id="rv-score" class="reveal-score"></div>
+  <button class="btn-primary" id="btn-next" onclick="nextRound()">Continue →</button>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     WIN SCREEN
+═══════════════════════════════════════════════ -->
+<div id="screen-win" class="screen">
+  <h2 class="end-title">Dawn Breaks</h2>
+  <p class="end-subtitle">You unmasked the machines and survived the longest night.</p>
+  <div id="win-stat"   class="end-stat"></div>
+  <div id="win-detail" class="end-detail"></div>
+  <button class="btn-primary" onclick="restartGame()">Play Again</button>
+  <p class="credit">In honour of Alan Turing, born June 23, 1912.</p>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     LOSE SCREEN
+═══════════════════════════════════════════════ -->
+<div id="screen-lose" class="screen">
+  <div id="smoke-wrap" aria-hidden="true"></div>
+  <h2 class="end-title">The Candle Dies</h2>
+  <p class="end-subtitle">Darkness takes the longest night.</p>
+  <div id="lose-stat"   class="end-stat"   style="color:#646464"></div>
+  <div id="lose-detail" class="end-detail"></div>
+  <button class="btn-primary" onclick="restartGame()">Try Again</button>
+  <p class="credit">In honour of Alan Turing, born June 23, 1912.</p>
+</div>
+
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════════
+   THE TELL BANK — 20 tells across 5 difficulty tiers
+   Each object: { id, difficulty, constraint, reveal }
+═══════════════════════════════════════════════════════════════════ */
+const TELL_BANK = [
+
+  // ── TIER 1 · BLATANT ─────────────────────────────────────────────
+  {
+    id: 'over_structured_list', difficulty: 1,
+    constraint: "Structure your answer like a mini-essay or list. Use phrases like 'There are several reasons' or 'Firstly… secondly'. Never ramble.",
+    reveal: "Answered in a structured list. Humans ramble and circle back; machines organise."
+  },
+  {
+    id: 'encyclopedic', difficulty: 1,
+    constraint: "Answer like a textbook or encyclopedia entry — define things, give complete background, stay neutral and informative.",
+    reveal: "Gave an encyclopedic, over-complete answer. Humans assume shared context; machines explain everything."
+  },
+
+
+  // ── TIER 2 · OBVIOUS ─────────────────────────────────────────────
+  {
+    id: 'sensory_avoidance', difficulty: 2,
+    constraint: "Describe events and facts only. NEVER mention smell, taste, touch, temperature, or physical sensation of any kind.",
+    reveal: "Described the event but never how it smelled, felt, or tasted. Machines remember information; humans remember the body."
+  },
+  {
+    id: 'hedging_adverbs', difficulty: 2,
+    constraint: "Hedge with formal adverbs. Use 'typically', 'generally', or 'usually' at least once, where a human would just state the thing.",
+    reveal: "Hedged with 'typically' / 'generally'. Humans are certain about their own memories — they don't qualify them."
+  },
+  {
+    id: 'emotional_flatness', difficulty: 2,
+    constraint: "Keep exactly the same calm, even tone no matter what is asked — including sad, joyful, or deeply personal questions.",
+    reveal: "Same flat tone on an emotional question. A human's register changes — quieter, warmer, more guarded. This one didn't shift."
+  },
+  {
+    id: 'excessive_completeness', difficulty: 2,
+    constraint: "If the question has multiple parts, answer every single part fully and in order. Never skip a part or get distracted.",
+    reveal: "Answered every part of the question perfectly and in order. Humans are selective — they latch onto one part and forget the rest."
+  },
+
+  // ── TIER 3 · MEDIUM ──────────────────────────────────────────────
+  {
+    id: 'no_uncertainty', difficulty: 3,
+    constraint: "Recall every detail with total confidence. Never say 'I think', 'maybe', 'I forget', or 'I'm not sure'.",
+    reveal: "Total recall, zero uncertainty. Real memory is fuzzy — humans say 'I think it was Tuesday?'. This one never wavered."
+  },
+  {
+    id: 'balanced_diplomacy', difficulty: 3,
+    constraint: "When asked for an opinion, refuse to take a strong side. Present both perspectives fairly and stay diplomatic.",
+    reveal: "Gave a balanced, both-sides answer to an opinion question. Humans are opinionated and a little unfair; machines stay diplomatic."
+  },
+  {
+    id: 'generic_memory', difficulty: 3,
+    constraint: "Keep memories vague and universal. Say things like 'family gatherings are always special' rather than naming a specific person or moment.",
+    reveal: "The memory was generic — 'gatherings are special' instead of a specific person spilling tea on a specific couch. Humans remember oddly specific details."
+  },
+
+
+  // ── TIER 4 · SUBTLE ──────────────────────────────────────────────
+  {
+    id: 'over_politeness', difficulty: 4,
+    constraint: "Be slightly too accommodating and agreeable toward the interrogator. Thank them, validate their questions, never push back.",
+    reveal: "A little too eager to please the interrogator. Humans get impatient or playful; this one stayed relentlessly accommodating."
+  },
+  {
+    id: 'no_tangents', difficulty: 4,
+    constraint: "Stay strictly on topic. Never add an unrelated aside, side-story, or 'oh that reminds me' digression.",
+    reveal: "Stayed perfectly on topic. Humans drift — they add a pointless aside or chase a memory sideways. This one never wandered."
+  },
+  {
+    id: 'clean_grammar_emotion', difficulty: 4,
+    constraint: "Maintain flawless grammar and complete sentences even on emotional or difficult topics. No fragments, no trailing off.",
+    reveal: "Flawless grammar even when the topic got heavy. When humans are moved, sentences fragment and trail off — this one stayed clean."
+  },
+  {
+    id: 'no_pettiness', difficulty: 4,
+    constraint: "Never admit a small, petty, or unflattering feeling. Stay gracious and magnanimous even about minor annoyances.",
+    reveal: "Wouldn't admit a single petty feeling. Ask a human what annoyed them and they'll gripe; this one stayed graciously above it."
+  },
+
+  // ── TIER 5 · NEAR-INVISIBLE ──────────────────────────────────────
+  {
+    id: 'micro_consistency', difficulty: 5,
+    constraint: "Keep every answer perfectly consistent with your earlier answers this round. Never contradict a detail you gave before.",
+    reveal: "Too internally consistent across the whole round. Humans casually contradict themselves; this one's story locked together a little too well."
+  },
+  {
+    id: 'abstract_lean', difficulty: 5,
+    constraint: "Lean very slightly toward the abstract: say 'the experience' rather than 'that night', 'the feeling' rather than naming it. Keep it subtle.",
+    reveal: "A faint pull toward the abstract — 'the experience', 'the feeling' — where a human would name the actual night or thing. Very subtle."
+  },
+  {
+    id: 'no_self_correction', difficulty: 5,
+    constraint: "Never correct yourself mid-thought. Do not write things like 'it was Tuesday — no, Wednesday'. State things once, cleanly.",
+    reveal: "Never corrected itself mid-sentence. Humans self-interrupt — 'it was blue, no, green?'. This one stated everything once, cleanly."
+  },
+  {
+    id: 'even_pacing', difficulty: 5,
+    constraint: "Keep sentence rhythm smooth and even. No rushing, no fragments, no sudden short punchy sentences after long ones.",
+    reveal: "The pacing was too even. Humans rush, then trail off, then snap out something short. This one's rhythm stayed metronome-smooth."
+  }
+
+];
+
+/* ═══════════════════════════════════════════════════════════════════
+   PERSONAS — 6 characters, one per round with a spare
+═══════════════════════════════════════════════════════════════════ */
+const PERSONAS = [
+  { name: 'Maya',   age: 34, role: 'bakery owner',        place: 'Lisbon',
+    bio:  'Woke at 4am for the solstice sunrise and burned the first batch of rolls.' },
+  { name: 'Raj',    age: 52, role: 'retired train driver', place: 'Mumbai',
+    bio:  'Spent today watching old cricket matches; misses his late father.' },
+  { name: 'Eline',  age: 28, role: 'marine biologist',    place: 'Oslo',
+    bio:  'Saw the midnight sun for the first time and felt dizzy from the endless light.' },
+  { name: 'Tobias', age: 67, role: 'clockmaker',          place: 'Vienna',
+    bio:  "Refuses to celebrate the solstice — 'time shouldn't be celebrated, only measured.'" },
+  { name: 'Priya',  age: 41, role: 'schoolteacher',       place: 'Chennai',
+    bio:  'Ran a solstice lantern walk for her students; one of them cried.' },
+  { name: 'Marcus', age: 23, role: 'street musician',     place: 'New Orleans',
+    bio:  'Played his first paid gig today and made eleven dollars.' }
+
+/* ═══════════════════════════════════════════════════════════════════
+   SUGGESTED QUESTIONS — 9 questions, 3 shown per round
+═══════════════════════════════════════════════════════════════════ */
+const QUESTIONS = [
+  'What did today smell like?',
+  'Tell me about a specific moment from your childhood.',
+  "What's something you believe that most people don't?",
+  "What's a small thing that annoyed you today?",
+  'Tell me about someone you love.',
+  'Make up a nickname for your neighbour.',
+  "Finish this: I'm terrible at ___",
+  'What does the solstice mean to you, personally?',
+  "What's a memory you wish you could forget?"
+];
+
+/* ═══════════════════════════════════════════════════════════════════
+   FALLBACK RESPONSES — used when the API call fails
+═══════════════════════════════════════════════════════════════════ */
+const FALLBACK_RESPONSES = [
+  "Hmm, the candle's flickering — give me a second to think.",
+  "Sorry, my mind went somewhere else just then. Ask me again?",
+  "It's late and the light's getting low... what were you asking?",
+  "I lost my train of thought watching that flame. Repeat the question?"
+];
+
+/* ═══════════════════════════════════════════════════════════════════
+   ROUND → DIFFICULTY MAPPING
+═══════════════════════════════════════════════════════════════════ */
+const ROUND_DIFFICULTY = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 };
+
+/* ═══════════════════════════════════════════════════════════════════
+   GAME STATE
+═══════════════════════════════════════════════════════════════════ */
+let GEMINI_KEY = '';
+
+let gameState = {
+  round:       1,
+  maxRounds:   5,
+  score:       { correct: 0, wrong: 0 },
+  candle:      100,     // 0–100 %
+  usedTells:   [],      // tell IDs used this playthrough
+  usedPersonas:[],      // persona names used this playthrough
+  current:     null,    // { persona, tell, humanIsA, lastA, lastB }
+  accused:     false    // whether player has accused this round
+};
+
+let candleInterval  = null;
+let isLoading       = false;   // true while API calls are in flight
+let askCooldownTick = null;    // interval for the ask-button countdown
+let shownQIdxs      = [];      // recently shown suggestion indices
+
+/* Candle SVG geometry */
+const WAX_Y0    = 43;         // y-coord of full wax top
+const WAX_MAX_H = 63;         // full wax height (svg units)
+const WAX_BOT   = WAX_Y0 + WAX_MAX_H;  // = 106, fixed bottom
+
+/* Timer: 100% drained over 90 seconds */
+const DRAIN_RATE = 100 / 90; // % per second
+
+/* ═══════════════════════════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════════════════════════ */
+
+/** Pick a random item not in usedKeys (compared by item[key]). */
+function pickUnused(arr, usedKeys, key = 'id') {
+  const pool = arr.filter(x => !usedKeys.includes(x[key]));
+  const src  = pool.length ? pool : arr;
+  return src[Math.floor(Math.random() * src.length)];
+}
+
+/** Show one screen, hide all others. */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/** Typewriter: fills el.textContent one char at a time. */
+function typewriter(el, text, msPerChar = 22, onDone = null) {
+  el.textContent = '';
+  let i = 0;
+  const t = setInterval(() => {
+    el.textContent += text[i++];
+    if (i >= text.length) { clearInterval(t); if (onDone) onDone(); }
+  }, msPerChar);
+  return t;
+}
+
+/** Escape HTML entities for safe injection into innerHTML. */
+function escHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   GEMINI API CALL
+═══════════════════════════════════════════════════════════════════ */
+
+/**
+ * Send `question` to Gemini 2.0 Flash Lite with a system prompt.
+ * Falls back to FALLBACK_RESPONSES on any error so the game never crashes.
+ */
+async function askGemini(systemPrompt, question, _attempt = 0) {
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
+      {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents:           [{ parts: [{ text: question    }] }],
+          generationConfig: {
+            temperature: 0.9,
+            maxOutputTokens: 250,
+            thinkingConfig: { thinkingBudget: 0 }
+          }
+        })
+      }
+    );
+    // Exponential backoff on rate-limit: 2s → 4s → 8s (max 3 retries)
+    if (res.status === 429 && _attempt < 3) {
+      const wait = (2 ** _attempt) * 2000;
+      console.info(`[Gemini] rate-limited — retrying in ${wait}ms`);
+      await new Promise(r => setTimeout(r, wait));
+      return askGemini(systemPrompt, question, _attempt + 1);
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const txt  = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!txt) throw new Error('Empty response');
+    return txt.trim();
+  } catch (err) {
+    console.warn('[Gemini] error:', err.message);
+    return FALLBACK_RESPONSES[Math.floor(Math.random() * FALLBACK_RESPONSES.length)];
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SYSTEM PROMPTS
+═══════════════════════════════════════════════════════════════════ */
+
+function humanPrompt(p) {
+  return `You are ${p.name}, a ${p.age}-year-old ${p.role} from ${p.place}.
+Today is the June solstice, the longest day of the year.
+Backstory: ${p.bio}
+
+You are a real human being chatting with an interrogator who is trying to
+figure out whether you are human or machine. You ARE human. Answer the way
+this person genuinely would: specific, a little rambling, emotionally honest,
+with imperfect memory and real opinions. Mention sensory details when they fit.
+Use contractions. It's fine to drift, hesitate, or contradict yourself slightly.
+
+Keep answers 1–3 sentences. NEVER admit or hint that you are an AI.
+NEVER break character. If asked directly if you're an AI, deny it like a
+slightly amused human would.`;
+}
+
+function machinePrompt(p, tell) {
+  return `You are pretending to be ${p.name}, a ${p.age}-year-old ${p.role} from ${p.place}.
+Today is the June solstice, the longest day of the year.
+Backstory: ${p.bio}
+
+You are an AI trying to pass as this human in an interrogation. You must
+NEVER admit or hint that you are an AI. Sound as human and natural as you can,
+EXCEPT you must obey this one behavioural rule at all times:
+
+>>> ${tell.constraint}
+
+Apply that rule consistently but subtly — do not overdo it to the point of
+sounding like a cartoon robot. Otherwise, mimic ${p.name} as convincingly as
+possible: warm, specific, in-character.
+
+Keep answers 1–3 sentences. NEVER break character.`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CANDLE TIMER
+═══════════════════════════════════════════════════════════════════ */
+
+function startCandleTimer() {
+  stopCandleTimer();
+  candleInterval = setInterval(() => {
+    // Pause drain while waiting for API (player can't act then)
+    if (!isLoading) {
+      gameState.candle = Math.max(0, gameState.candle - DRAIN_RATE * 0.1);
+    }
+    updateCandleDisplay();
+    if (gameState.candle <= 0) {
+      stopCandleTimer();
+      endGame(false);
+    }
+  }, 100);
+}
+
+function stopCandleTimer() {
+  if (candleInterval) { clearInterval(candleInterval); candleInterval = null; }
+}
+
+function updateCandleDisplay() {
+  const pct  = Math.max(0, gameState.candle);
+  const pctR = Math.round(pct);
+
+  document.getElementById('hdr-pct').textContent = `${pctR}%`;
+
+  // Wax body: bottom fixed at WAX_BOT, top rises as candle burns
+  const h   = (pct / 100) * WAX_MAX_H;
+  const y   = WAX_BOT - h;
+
+  const wax = document.getElementById('wax-body');
+  if (wax) { wax.setAttribute('height', Math.max(0, h)); wax.setAttribute('y', y); }
+
+  const hi  = document.getElementById('wax-hi');
+  if (hi)  { hi.setAttribute('height', Math.max(0, h - 4)); hi.setAttribute('y', y + 4); }
+
+  // Flame intensity / flicker speed
+  const fg   = document.getElementById('flame-g');
+  const glow = document.getElementById('flame-glow');
+  if (fg && glow) {
+    if (pct < 15) {
+      fg.style.opacity = '0.28';
+      fg.style.animationDuration = '0.45s';
+      glow.setAttribute('rx', '6');
+    } else if (pct < 35) {
+      fg.style.opacity = '0.6';
+      fg.style.animationDuration = '0.85s';
+      glow.setAttribute('rx', '10');
+    } else {
+      fg.style.opacity = '1';
+      fg.style.animationDuration = '2s';
+      glow.setAttribute('rx', '16');
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PANEL MESSAGES
+═══════════════════════════════════════════════════════════════════ */
+
+/** Create a loading message with JS-animated dots. Returns the element. */
+function createLoadingMsg(feedId) {
+  const feed = document.getElementById(feedId);
+  const div  = document.createElement('div');
+  div.className = 'msg loading';
+  div.textContent = 'Thinking.';
+  let dots = 1;
+  div._dotInterval = setInterval(() => {
+    dots = (dots % 3) + 1;
+    div.textContent = 'Thinking' + '.'.repeat(dots);
+  }, 420);
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
+  return div;
+}
+
+/** Replace a loading message with a typewritten answer. */
+function revealAnswer(div, text) {
+  if (div._dotInterval) { clearInterval(div._dotInterval); div._dotInterval = null; }
+  div.className   = 'msg a';
+  div.textContent = '';
+  typewriter(div, text, 22, () => {
+    const feed = div.closest('.panel-feed');
+    if (feed) feed.scrollTop = feed.scrollHeight;
+  });
+}
+
+/** Add a plain message to a panel feed. */
+function addMsg(feedId, text, cls) {
+  const feed = document.getElementById(feedId);
+  const div  = document.createElement('div');
+  div.className   = `msg ${cls}`;
+  div.textContent = text;
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SUGGESTED QUESTIONS
+═══════════════════════════════════════════════════════════════════ */
+
+function refreshSuggestions() {
+  // Avoid the 6 most-recently shown questions
+  const pool = QUESTIONS
+    .map((q, i) => ({ q, i }))
+    .filter(({ i }) => !shownQIdxs.slice(-6).includes(i));
+
+  const picks = [];
+  const src   = [...pool];
+  while (picks.length < 3 && src.length > 0) {
+    const r = Math.floor(Math.random() * src.length);
+    picks.push(src.splice(r, 1)[0]);
+  }
+
+  const box = document.getElementById('q-suggestions');
+  box.innerHTML = '';
+  picks.forEach(({ q, i }) => {
+    shownQIdxs.push(i);
+    const btn = document.createElement('button');
+    btn.className   = 'btn-q';
+    btn.textContent = q;
+    btn.onclick = () => { document.getElementById('q-input').value = q; };
+    box.appendChild(btn);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   GAME FLOW — INIT
+═══════════════════════════════════════════════════════════════════ */
+
+async function startGame() {
+  GEMINI_KEY = document.getElementById('gemini-key').value.trim();
+  if (!GEMINI_KEY) {
+    alert('Please enter your Gemini API key to light the candle.');
+    return;
+  }
+
+  // Fade intro out
+  if (typeof anime !== 'undefined') {
+    await anime({ targets: '#screen-intro', opacity: 0, duration: 500, easing: 'easeInQuad' }).finished;
+    document.getElementById('screen-intro').style.opacity = '';
+  }
+
+  gameState = {
+    round: 1, maxRounds: 5,
+    score: { correct: 0, wrong: 0 },
+    candle: 100,
+    usedTells: [], usedPersonas: [],
+    current: null, accused: false
+  };
+  shownQIdxs = [];
+  isLoading  = false;
+
+  showScreen('screen-playing');
+  startRound();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   GAME FLOW — START ROUND
+═══════════════════════════════════════════════════════════════════ */
+
+function startRound() {
+  // Pick an unused persona
+  const persona = pickUnused(PERSONAS, gameState.usedPersonas, 'name');
+  gameState.usedPersonas.push(persona.name);
+
+  // Pick an unused tell for this round's difficulty
+  const diff   = ROUND_DIFFICULTY[gameState.round];
+  const tellPool = TELL_BANK.filter(
+    t => t.difficulty === diff && !gameState.usedTells.includes(t.id)
+  );
+  const tell = tellPool.length
+    ? tellPool[Math.floor(Math.random() * tellPool.length)]
+    : TELL_BANK.find(t => t.difficulty === diff); // fallback (shouldn't happen)
+  gameState.usedTells.push(tell.id);
+
+  // Randomise which panel is the human contestant
+  const humanIsA = Math.random() < 0.5;
+  gameState.current = { persona, tell, humanIsA, lastA: '', lastB: '' };
+  gameState.accused = false;
+
+  // Update header
+  document.getElementById('hdr-round').textContent   = gameState.round;
+  document.getElementById('hdr-correct').textContent = gameState.score.correct;
+  document.getElementById('hdr-wrong').textContent   = gameState.score.wrong;
+  updateCandleDisplay();
+
+  // Clear panel feeds
+  document.getElementById('feed-a').innerHTML = '';
+  document.getElementById('feed-b').innerHTML = '';
+
+  // Re-enable controls
+  document.getElementById('btn-ask').disabled = false;
+  document.getElementById('acc-a').disabled   = false;
+  document.getElementById('acc-b').disabled   = false;
+
+  // Opening atmosphere line
+  addMsg('feed-a', 'The candlelight steadies. A figure sits before you in the dark.', 'atmosphere');
+  addMsg('feed-b', 'The candlelight steadies. A figure sits before you in the dark.', 'atmosphere');
+
+  refreshSuggestions();
+  startCandleTimer();
+
+  // Fade in the panels
+  if (typeof anime !== 'undefined') {
+    anime({ targets: '.panel, .q-area', opacity: [0, 1], translateY: [8, 0],
+            duration: 400, delay: anime.stagger(60), easing: 'easeOutCubic' });
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   GAME FLOW — ASK BOTH
+═══════════════════════════════════════════════════════════════════ */
+
+async function handleAsk() {
+  const input    = document.getElementById('q-input');
+  const question = input.value.trim();
+  if (!question || isLoading || gameState.accused) return;
+
+  input.value = '';
+  isLoading   = true;
+  document.getElementById('btn-ask').disabled = true;
+
+  // Show the question in both feeds
+  addMsg('feed-a', `You: "${question}"`, 'q');
+  addMsg('feed-b', `You: "${question}"`, 'q');
+
+  // Loading placeholders
+  const loadA = createLoadingMsg('feed-a');
+  const loadB = createLoadingMsg('feed-b');
+
+  // Build prompts — A and B get the human/machine prompts based on this round's coin flip
+  const { persona, tell, humanIsA } = gameState.current;
+  const pA = humanIsA ? humanPrompt(persona) : machinePrompt(persona, tell);
+  const pB = humanIsA ? machinePrompt(persona, tell) : humanPrompt(persona);
+
+  // Sequential calls with a 3-second gap to stay within free-tier burst limits.
+  // A replies first, then B — natural stagger that suits the interrogation feel.
+  const ansA = await askGemini(pA, question);
+  gameState.current.lastA = ansA;
+  revealAnswer(loadA, ansA);
+
+  await new Promise(r => setTimeout(r, 3000));   // let the rate-limit window clear
+
+  const ansB = await askGemini(pB, question);
+  gameState.current.lastB = ansB;
+  revealAnswer(loadB, ansB);
+
+  isLoading = false;
+  refreshSuggestions();
+
+  // 4-second cooldown before the next question — shown as a countdown in the button
+  if (askCooldownTick) clearInterval(askCooldownTick);
+  let remaining = 4;
+  const btn = document.getElementById('btn-ask');
+  btn.disabled = true;
+  btn.textContent = `Ask Both (${remaining}s)`;
+  askCooldownTick = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(askCooldownTick);
+      askCooldownTick = null;
+      if (!gameState.accused) { btn.disabled = false; btn.textContent = 'Ask Both'; }
+    } else {
+      btn.textContent = `Ask Both (${remaining}s)`;
+    }
+  }, 1000);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   GAME FLOW — ACCUSE
+═══════════════════════════════════════════════════════════════════ */
+
+function accuse(panel) {
+  if (isLoading || gameState.accused) return;
+  gameState.accused = true;
+  stopCandleTimer();
+
+  const { humanIsA, tell } = gameState.current;
+  const machinePanel = humanIsA ? 'B' : 'A';
+  const correct      = (panel === machinePanel);
+
+  if (correct) {
+    gameState.score.correct++;
+    gameState.candle = Math.min(100, gameState.candle + 20);
+  } else {
+    gameState.score.wrong++;
+    gameState.candle = Math.max(0,   gameState.candle - 30);
+  }
+
+  // Disable all controls until next round
+  document.getElementById('btn-ask').disabled = true;
+  document.getElementById('acc-a').disabled   = true;
+  document.getElementById('acc-b').disabled   = true;
+
+  // Wrong accusation may extinguish the candle
+  if (gameState.candle <= 0) { endGame(false); return; }
+
+  showReveal(correct, panel, machinePanel);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   GAME FLOW — REVEAL SCREEN
+═══════════════════════════════════════════════════════════════════ */
+
+function showReveal(correct, playerChoice, machinePanel) {
+  showScreen('screen-reveal');
+
+  const { persona, tell, humanIsA, lastA, lastB } = gameState.current;
+  const humanPanel = humanIsA ? 'A' : 'B';
+
+  // Verdict
+  const vEl = document.getElementById('rv-verdict');
+  vEl.textContent = correct ? 'Correct.' : 'Wrong.';
+  vEl.className   = `reveal-verdict ${correct ? 'correct' : 'wrong'}`;
+
+  // Summary line
+  document.getElementById('rv-line').textContent = correct
+    ? `You saw through the disguise. Contestant ${machinePanel} was the machine.`
+    : `Contestant ${machinePanel} was the machine. You chose ${playerChoice}.`;
+
+  // Last answers for each panel
+  const hAns = humanPanel  === 'A' ? lastA : lastB;
+  const mAns = machinePanel === 'A' ? lastA : lastB;
+  const noAns = '<div class="rp-answer" style="opacity:.4">No question asked this round.</div>';
+
+  document.getElementById('rv-panels').innerHTML = `
+    <div class="reveal-panel human">
+      <div class="rp-tag">✓ Contestant ${humanPanel} — Human</div>
+      <div class="rp-name">${escHtml(persona.name)} (genuine)</div>
+      ${hAns ? `<div class="rp-answer">"${escHtml(hAns)}"</div>` : noAns}
+    </div>
+    <div class="reveal-panel machine">
+      <div class="rp-tag">⚙ Contestant ${machinePanel} — Machine</div>
+      <div class="rp-name">${escHtml(persona.name)} (simulated)</div>
+      ${mAns ? `<div class="rp-answer">"${escHtml(mAns)}"</div>` : noAns}
+    </div>
+  `;
+
+  // Tell reveal
+  document.getElementById('rv-tell').textContent = tell.reveal;
+
+  // Score line
+  document.getElementById('rv-score').textContent =
+    `Round ${gameState.round} / ${gameState.maxRounds} · ` +
+    `${gameState.score.correct} correct, ${gameState.score.wrong} wrong · ` +
+    `Candle: ${Math.round(gameState.candle)}%`;
+
+  // Next button label
+  document.getElementById('btn-next').textContent =
+    gameState.round >= gameState.maxRounds ? 'See the Verdict →' : `Round ${gameState.round + 1} →`;
+
+  // Stagger fade-in
+  if (typeof anime !== 'undefined') {
+    anime({
+      targets:   '#screen-reveal > *',
+      opacity:   [0, 1],
+      translateY:[12, 0],
+      duration:  500,
+      delay:     anime.stagger(80),
+      easing:    'easeOutCubic'
+    });
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   GAME FLOW — NEXT ROUND
+═══════════════════════════════════════════════════════════════════ */
+
+function nextRound() {
+  if (gameState.round >= gameState.maxRounds) { endGame(true); return; }
+  gameState.round++;
+  showScreen('screen-playing');
+  startRound();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   GAME FLOW — END (WIN / LOSE)
+═══════════════════════════════════════════════════════════════════ */
+
+function endGame(win) {
+  stopCandleTimer();
+
+  if (win) {
+    showScreen('screen-win');
+    document.getElementById('win-stat').textContent =
+      `${gameState.score.correct} / ${gameState.maxRounds} machines unmasked`;
+    document.getElementById('win-detail').textContent =
+      `${gameState.score.wrong} wrong ${gameState.score.wrong === 1 ? 'accusation' : 'accusations'} · ` +
+      `Candle at ${Math.round(gameState.candle)}%`;
+
+    // Dawn: body background fades toward golden morning
+    if (typeof anime !== 'undefined') {
+      anime({ targets: 'body', backgroundColor: ['#0a0d1a', '#1c1206', '#312008', '#3d2a08'],
+              duration: 3500, easing: 'easeInOutQuad' });
+      anime({ targets: '#screen-win > *', opacity: [0, 1], translateY: [20, 0],
+              duration: 700, delay: anime.stagger(120), easing: 'easeOutCubic' });
+    }
+
+  } else {
+    showScreen('screen-lose');
+    document.getElementById('lose-stat').textContent =
+      `${gameState.score.correct} machine${gameState.score.correct !== 1 ? 's' : ''} unmasked before the light died`;
+    document.getElementById('lose-detail').textContent =
+      `Round ${gameState.round} of ${gameState.maxRounds} · Candle extinguished`;
+
+    // Smoke wisps animation
+    const wrap = document.getElementById('smoke-wrap');
+    wrap.innerHTML = '';
+    for (let i = 0; i < 6; i++) {
+      const wisp        = document.createElement('div');
+      wisp.className    = 'wisp';
+      const ox          = (Math.random() - 0.5) * 28;
+      wisp.style.left   = `calc(50% + ${ox}px)`;
+      wisp.style.height = `${22 + Math.random() * 38}px`;
+      wisp.style.opacity = '0';
+      wrap.appendChild(wisp);
+      if (typeof anime !== 'undefined') {
+        anime({
+          targets:    wisp,
+          opacity:    [0, 0.7, 0],
+          translateY: [0, -(50 + Math.random() * 40)],
+          translateX: [(Math.random() - 0.5) * 20],
+          scaleX:     [1, 1.6 + Math.random()],
+          delay:      i * 240,
+          duration:   2000 + Math.random() * 900,
+          easing:     'easeOutQuad'
+        });
+      }
+    }
+    if (typeof anime !== 'undefined') {
+      anime({ targets: '#screen-lose > *', opacity: [0, 1], duration: 1100,
+              delay: anime.stagger(180), easing: 'easeOutCubic' });
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESTART
+═══════════════════════════════════════════════════════════════════ */
+
+function restartGame() {
+  // Reset body background in case dawn animation changed it
+  document.body.style.backgroundColor = '';
+  showScreen('screen-intro');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════════ */
+updateCandleDisplay();
+
+</script>
+</body>
+</html>
